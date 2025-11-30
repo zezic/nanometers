@@ -844,10 +844,14 @@ impl NanometersApp {
                 if theme_changed {
                     if let Some(theme) = new_theme {
                         self.setting.theme = theme.clone();
+                        self.setting.current_theme_name =
+                            self.setting.theme_manager.current_theme_name.clone();
                         ui.ctx().set_visuals(set_theme(self));
                         let mut audio_source_setting =
                             self.audio_source_setting.try_lock().unwrap();
                         audio_source_setting.theme = theme;
+                        audio_source_setting.current_theme_name =
+                            self.setting.current_theme_name.clone();
                     }
                 }
 
@@ -967,10 +971,12 @@ impl NanometersApp {
                         // Switch to the new theme and start editing it
                         self.setting.theme_manager.set_current_theme(&new_name);
                         self.setting.theme = new_theme.clone();
+                        self.setting.current_theme_name = new_name.clone();
                         ui.ctx().set_visuals(set_theme(self));
                         let mut audio_source_setting =
                             self.audio_source_setting.try_lock().unwrap();
                         audio_source_setting.theme = new_theme.clone();
+                        audio_source_setting.current_theme_name = new_name.clone();
 
                         // Start editing the new copy
                         self.theme_editor.editing_theme = Some(new_name);
@@ -1137,10 +1143,14 @@ impl NanometersApp {
                         if let Some(theme) = self.setting.theme_manager.get_current_theme() {
                             let new_theme = theme.clone();
                             self.setting.theme = new_theme.clone();
+                            self.setting.current_theme_name =
+                                self.setting.theme_manager.current_theme_name.clone();
                             ui.ctx().set_visuals(set_theme(self));
                             let mut audio_source_setting =
                                 self.audio_source_setting.try_lock().unwrap();
                             audio_source_setting.theme = new_theme;
+                            audio_source_setting.current_theme_name =
+                                self.setting.current_theme_name.clone();
                         }
                         self.theme_editor.show_delete_dialog = false;
                     }

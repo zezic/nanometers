@@ -103,6 +103,10 @@ impl NanometersApp {
                 eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
             // Initialize theme manager after deserialization
             app.setting.theme_manager = ThemeManager::new();
+            // Restore the saved theme selection
+            app.setting
+                .theme_manager
+                .set_current_theme(&app.setting.current_theme_name);
             // Set current theme from manager
             if let Some(current_theme) = app.setting.theme_manager.get_current_theme() {
                 app.setting.theme = current_theme.clone();
