@@ -81,7 +81,7 @@ impl NanometersApp {
                 + rect.left();
         ui.painter().line_segment(
             [pos2(ref_line_x, 0.0), pos2(ref_line_x, rect.bottom())],
-            Stroke::new(1.0, self.setting.theme.main),
+            Stroke::new(1.0, self.setting.theme.spectrum_ref_line),
         );
 
         // Main
@@ -188,14 +188,14 @@ impl NanometersApp {
                     wave_0_points,
                     Stroke::new(
                         self.setting.spectrum.line_thickness,
-                        self.setting.theme.main,
+                        self.setting.theme.spectrum_main,
                     ),
                 );
                 let wave_1 = Shape::line(
                     wave_1_points,
                     Stroke::new(
                         self.setting.spectrum.line_thickness,
-                        self.setting.theme.text,
+                        self.setting.theme.spectrum_secondary,
                     ),
                 );
                 ui.painter().add(wave_0);

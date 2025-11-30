@@ -32,10 +32,17 @@ pub struct Setting {
     pub spectrum: SpectrumSetting,
     pub meters: Vec<Vec<MeterList>>,
     pub theme: Theme,
+    #[serde(skip)]
+    pub theme_manager: ThemeManager,
 }
 
 impl Default for Setting {
     fn default() -> Self {
+        let theme_manager = ThemeManager::new();
+        let theme = theme_manager
+            .get_current_theme()
+            .cloned()
+            .unwrap_or(DARK_THEME);
         Self {
             audio_device: AudioDeviceSetting::default(),
             waveform: WaveformSetting::default(),
@@ -55,7 +62,8 @@ impl Default for Setting {
                 ],
                 vec![],
             ],
-            theme: DARK_THEME,
+            theme,
+            theme_manager,
         }
     }
 }

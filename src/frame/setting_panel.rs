@@ -1,5 +1,5 @@
 use crate::audio::*;
-use crate::setting::{self, set_theme, VectorscopeMode};
+use crate::setting::{self, set_theme, Theme, VectorscopeMode};
 use crate::utils::*;
 use crate::NanometersApp;
 use egui::style::{Selection, WidgetVisuals, Widgets};
@@ -9,6 +9,23 @@ use egui::*;
 struct Location {
     col: usize,
     row: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ThemeEditor {
+    pub show_create_dialog: bool,
+    pub new_theme_name: String,
+    pub editing_theme: Option<String>,
+    pub temp_theme: Theme,
+    pub show_rename_dialog: bool,
+    pub rename_old_name: String,
+    pub rename_new_name: String,
+    pub show_delete_dialog: bool,
+    pub delete_theme_name: String,
+    pub show_create_copy_dialog: bool,
+    pub copy_original_name: String,
+    pub copy_new_name: String,
+    pub error_message: Option<String>,
 }
 
 impl NanometersApp {
@@ -799,37 +816,355 @@ impl NanometersApp {
         ui.group(|ui| {
             ui.vertical(|ui| {
                 ui.heading("Theme");
+
+                // Theme selection
+                // Theme selection
+                let theme_names = self.setting.theme_manager.get_theme_names();
+                let current_name = self.setting.theme_manager.current_theme_name.clone();
+                let mut theme_changed = false;
+                let mut new_theme = None;
+
                 ui.horizontal(|ui| {
-                    if ui
-                        .selectable_value(&mut self.setting.theme, setting::DARK_THEME, "Dark")
-                        .changed()
-                    {
-                        self.setting.theme = setting::DARK_THEME;
+                    for theme_name in &theme_names {
+                        if ui
+                            .selectable_label(current_name == *theme_name, theme_name)
+                            .clicked()
+                        {
+                            if self.setting.theme_manager.set_current_theme(theme_name) {
+                                if let Some(theme) = self.setting.theme_manager.get_current_theme()
+                                {
+                                    new_theme = Some(theme.clone());
+                                    theme_changed = true;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                if theme_changed {
+                    if let Some(theme) = new_theme {
+                        self.setting.theme = theme.clone();
                         ui.ctx().set_visuals(set_theme(self));
-                        let mut audio_souce_setting = self.audio_source_setting.try_lock().unwrap();
-                        audio_souce_setting.theme = self.setting.theme;
-                    };
-                    if ui
-                        .selectable_value(&mut self.setting.theme, setting::LIGHT_THEME, "Light")
-                        .changed()
-                    {
-                        self.setting.theme = setting::LIGHT_THEME;
+                        let mut audio_source_setting =
+                            self.audio_source_setting.try_lock().unwrap();
+                        audio_source_setting.theme = theme;
+                    }
+                }
+
+                // Theme management buttons
+                ui.horizontal(|ui| {
+                    if ui.button("New").clicked() {
+                        self.theme_editor.show_create_dialog = true;
+                        self.theme_editor.new_theme_name.clear();
+                    }
+
+                    if ui.button("Edit").clicked() {
+                        if self.setting.theme_manager.is_builtin_theme(&current_name) {
+                            // For built-in themes, show dialog to create a copy
+                            self.theme_editor.show_create_copy_dialog = true;
+                            self.theme_editor.copy_original_name = current_name.clone();
+                            self.theme_editor.copy_new_name = format!("{} Copy", current_name);
+                        } else {
+                            // For custom themes, edit directly
+                            self.theme_editor.editing_theme = Some(current_name.clone());
+                            if let Some(theme) = self.setting.theme_manager.get_current_theme() {
+                                self.theme_editor.temp_theme = theme.clone();
+                            }
+                        }
+                    }
+
+                    if !self.setting.theme_manager.is_builtin_theme(&current_name) {
+                        if ui.button("Rename").clicked() {
+                            self.theme_editor.show_rename_dialog = true;
+                            self.theme_editor.rename_old_name = current_name.clone();
+                            self.theme_editor.rename_new_name = current_name.clone();
+                        }
+
+                        if ui.button("Delete").clicked() {
+                            self.theme_editor.show_delete_dialog = true;
+                            self.theme_editor.delete_theme_name = current_name;
+                        }
+                    }
+                });
+
+                // Theme editor dialogs
+                self.theme_editor_dialogs(ui);
+            });
+        });
+    }
+
+    fn theme_editor_dialogs(&mut self, ui: &mut Ui) {
+        // Create new theme dialog
+        if self.theme_editor.show_create_dialog {
+            let mut create_clicked = false;
+            let mut cancel_clicked = false;
+            let theme_name = self.theme_editor.new_theme_name.clone();
+
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Create New Theme");
+                    ui.horizontal(|ui| {
+                        ui.label("Name:");
+                        ui.text_edit_singleline(&mut self.theme_editor.new_theme_name);
+                    });
+                    ui.horizontal(|ui| {
+                        create_clicked = ui.button("Create").clicked();
+                        cancel_clicked = ui.button("Cancel").clicked();
+                    });
+                });
+            });
+
+            if create_clicked && !theme_name.is_empty() {
+                match self.setting.theme_manager.create_new_theme(&theme_name) {
+                    Ok(_) => {
+                        self.theme_editor.show_create_dialog = false;
+                        self.theme_editor.new_theme_name.clear();
+                    }
+                    Err(e) => {
+                        self.theme_editor.error_message =
+                            Some(format!("Error creating theme: {}", e));
+                    }
+                }
+            } else if cancel_clicked {
+                self.theme_editor.show_create_dialog = false;
+                self.theme_editor.new_theme_name.clear();
+            }
+        }
+
+        // Create copy dialog for built-in themes
+        if self.theme_editor.show_create_copy_dialog {
+            let mut create_clicked = false;
+            let mut cancel_clicked = false;
+            let original_name = self.theme_editor.copy_original_name.clone();
+            let new_name = self.theme_editor.copy_new_name.clone();
+
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Create Copy of Built-in Theme");
+                    ui.label(format!(
+                        "Built-in theme '{}' cannot be edited directly.",
+                        original_name
+                    ));
+                    ui.label("Create a copy to customize:");
+                    ui.horizontal(|ui| {
+                        ui.label("Copy name:");
+                        ui.text_edit_singleline(&mut self.theme_editor.copy_new_name);
+                    });
+                    ui.horizontal(|ui| {
+                        create_clicked = ui.button("Create Copy").clicked();
+                        cancel_clicked = ui.button("Cancel").clicked();
+                    });
+                });
+            });
+
+            if create_clicked && !new_name.is_empty() {
+                match self
+                    .setting
+                    .theme_manager
+                    .save_theme_as_copy(&original_name, &new_name)
+                {
+                    Ok(new_theme) => {
+                        // Switch to the new theme and start editing it
+                        self.setting.theme_manager.set_current_theme(&new_name);
+                        self.setting.theme = new_theme.clone();
                         ui.ctx().set_visuals(set_theme(self));
-                        let mut audio_souce_setting = self.audio_source_setting.try_lock().unwrap();
-                        audio_souce_setting.theme = self.setting.theme;
-                    };
-                    if ui
-                        .selectable_value(&mut self.setting.theme, setting::PINK_THEME, "Pink")
-                        .changed()
-                    {
-                        self.setting.theme = setting::PINK_THEME;
+                        let mut audio_source_setting =
+                            self.audio_source_setting.try_lock().unwrap();
+                        audio_source_setting.theme = new_theme.clone();
+
+                        // Start editing the new copy
+                        self.theme_editor.editing_theme = Some(new_name);
+                        self.theme_editor.temp_theme = new_theme;
+                        self.theme_editor.show_create_copy_dialog = false;
+                    }
+                    Err(e) => {
+                        self.theme_editor.error_message =
+                            Some(format!("Error creating copy: {}", e));
+                    }
+                }
+            } else if cancel_clicked {
+                self.theme_editor.show_create_copy_dialog = false;
+            }
+        }
+
+        // Edit theme dialog
+        if let Some(ref editing_name) = self.theme_editor.editing_theme.clone() {
+            let mut save_clicked = false;
+            let mut cancel_clicked = false;
+
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.heading(format!("Edit Theme: {}", editing_name));
+
+                    // Color editors
+                    ui.horizontal(|ui| {
+                        ui.label("Main:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.main);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Background:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.bg);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("BG Accent:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.bgaccent);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Text:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.text);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Accent:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.accent);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Frame:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.frame);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Selection:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.selection);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Spectrum Main:");
+                        ui.color_edit_button_srgba(&mut self.theme_editor.temp_theme.spectrum_main);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Spectrum Secondary:");
+                        ui.color_edit_button_srgba(
+                            &mut self.theme_editor.temp_theme.spectrum_secondary,
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Spectrum Ref Line:");
+                        ui.color_edit_button_srgba(
+                            &mut self.theme_editor.temp_theme.spectrum_ref_line,
+                        );
+                    });
+
+                    ui.horizontal(|ui| {
+                        save_clicked = ui.button("Save").clicked();
+                        cancel_clicked = ui.button("Cancel").clicked();
+                    });
+                });
+            });
+
+            if save_clicked {
+                let temp_theme = self.theme_editor.temp_theme.clone();
+                match self.setting.theme_manager.save_theme(temp_theme.clone()) {
+                    Ok(_) => {
+                        self.setting.theme = temp_theme.clone();
                         ui.ctx().set_visuals(set_theme(self));
-                        let mut audio_souce_setting = self.audio_source_setting.try_lock().unwrap();
-                        audio_souce_setting.theme = self.setting.theme;
+                        let mut audio_source_setting =
+                            self.audio_source_setting.try_lock().unwrap();
+                        audio_source_setting.theme = temp_theme;
+                        self.theme_editor.editing_theme = None;
+                    }
+                    Err(e) => {
+                        self.theme_editor.error_message =
+                            Some(format!("Error saving theme: {}", e));
+                    }
+                }
+            } else if cancel_clicked {
+                self.theme_editor.editing_theme = None;
+            }
+        }
+
+        // Rename theme dialog
+        if self.theme_editor.show_rename_dialog {
+            let mut rename_clicked = false;
+            let mut cancel_clicked = false;
+            let old_name = self.theme_editor.rename_old_name.clone();
+            let new_name = self.theme_editor.rename_new_name.clone();
+
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Rename Theme");
+                    ui.horizontal(|ui| {
+                        ui.label("New name:");
+                        ui.text_edit_singleline(&mut self.theme_editor.rename_new_name);
+                    });
+                    ui.horizontal(|ui| {
+                        rename_clicked = ui.button("Rename").clicked();
+                        cancel_clicked = ui.button("Cancel").clicked();
+                    });
+                });
+            });
+
+            if rename_clicked && !new_name.is_empty() {
+                match self
+                    .setting
+                    .theme_manager
+                    .rename_theme(&old_name, &new_name)
+                {
+                    Ok(_) => {
+                        self.theme_editor.show_rename_dialog = false;
+                    }
+                    Err(e) => {
+                        self.theme_editor.error_message =
+                            Some(format!("Error renaming theme: {}", e));
+                    }
+                }
+            } else if cancel_clicked {
+                self.theme_editor.show_rename_dialog = false;
+            }
+        }
+
+        // Delete confirmation dialog
+        if self.theme_editor.show_delete_dialog {
+            let mut delete_clicked = false;
+            let mut cancel_clicked = false;
+            let delete_name = self.theme_editor.delete_theme_name.clone();
+
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Delete Theme");
+                    ui.label(format!(
+                        "Are you sure you want to delete '{}'?",
+                        delete_name
+                    ));
+                    ui.horizontal(|ui| {
+                        delete_clicked = ui.button("Delete").clicked();
+                        cancel_clicked = ui.button("Cancel").clicked();
+                    });
+                });
+            });
+
+            if delete_clicked {
+                match self.setting.theme_manager.delete_theme(&delete_name) {
+                    Ok(_) => {
+                        // Switch to current theme after deletion
+                        if let Some(theme) = self.setting.theme_manager.get_current_theme() {
+                            let new_theme = theme.clone();
+                            self.setting.theme = new_theme.clone();
+                            ui.ctx().set_visuals(set_theme(self));
+                            let mut audio_source_setting =
+                                self.audio_source_setting.try_lock().unwrap();
+                            audio_source_setting.theme = new_theme;
+                        }
+                        self.theme_editor.show_delete_dialog = false;
+                    }
+                    Err(e) => {
+                        self.theme_editor.error_message =
+                            Some(format!("Error deleting theme: {}", e));
+                    }
+                }
+            } else if cancel_clicked {
+                self.theme_editor.show_delete_dialog = false;
+            }
+        }
+
+        // Show error message if any
+        if let Some(ref error) = self.theme_editor.error_message.clone() {
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(Color32::RED, error);
+                    if ui.button("OK").clicked() {
+                        self.theme_editor.error_message = None;
                     }
                 });
             });
-        });
+        }
     }
 
     pub fn cpu_setting_block(&mut self, ui: &mut Ui) {

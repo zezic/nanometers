@@ -51,6 +51,8 @@ pub struct NanometersApp {
     pub(crate) spectrogram: Spectrogram,
     pub(crate) oscilloscope: Oscilloscope,
     pub(crate) spectrum: Spectrum,
+    #[serde(skip)]
+    pub(crate) theme_editor: crate::frame::setting_panel::ThemeEditor,
 }
 
 impl Default for NanometersApp {
@@ -86,6 +88,7 @@ impl Default for NanometersApp {
             spectrogram: Spectrogram::default(),
             oscilloscope: Oscilloscope::default(),
             spectrum: Spectrum::default(),
+            theme_editor: crate::frame::setting_panel::ThemeEditor::default(),
         }
     }
 }
@@ -98,6 +101,12 @@ impl NanometersApp {
         if let Some(storage) = cc.storage {
             let mut app: NanometersApp =
                 eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            // Initialize theme manager after deserialization
+            app.setting.theme_manager = ThemeManager::new();
+            // Set current theme from manager
+            if let Some(current_theme) = app.setting.theme_manager.get_current_theme() {
+                app.setting.theme = current_theme.clone();
+            }
             cc.egui_ctx.set_visuals(set_theme(&mut app));
             app.audio_source_setting = Arc::new(Mutex::new(app.setting.clone()));
             match app.setting.audio_device.device {
