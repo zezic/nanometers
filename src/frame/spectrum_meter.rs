@@ -198,8 +198,8 @@ impl NanometersApp {
                         self.setting.theme.spectrum_secondary,
                     ),
                 );
-                ui.painter().add(wave_0);
                 ui.painter().add(wave_1);
+                ui.painter().add(wave_0);
             }
             SpectrumMode::ColorBar => {}
             SpectrumMode::Both => {}
