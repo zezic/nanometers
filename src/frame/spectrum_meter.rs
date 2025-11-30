@@ -37,17 +37,19 @@ impl NanometersApp {
             SpectrumFreqLine::On => {
                 if self.spectrum.last_rect.is_none() {
                     self.spectrum.last_rect = Some(rect);
-                    self.spectrum.lines = ref_lines(ui, rect, 0.5, self.setting.theme.frame);
+                    self.spectrum.lines =
+                        ref_lines(ui, rect, 0.5, self.setting.theme.spectrum_ref_line);
                     self.spectrum.line_brightness = false;
                 } else {
                     if self.spectrum.last_rect.unwrap() != rect {
                         self.spectrum.last_rect = Some(rect);
-                        self.spectrum.lines = ref_lines(ui, rect, 0.5, self.setting.theme.frame);
+                        self.spectrum.lines =
+                            ref_lines(ui, rect, 0.5, self.setting.theme.spectrum_ref_line);
                         self.spectrum.line_brightness = false;
                     } else {
                         if self.spectrum.line_brightness {
                             self.spectrum.lines =
-                                ref_lines(ui, rect, 0.5, self.setting.theme.frame);
+                                ref_lines(ui, rect, 0.5, self.setting.theme.spectrum_ref_line);
                             self.spectrum.line_brightness = false;
                         }
                     }
@@ -58,17 +60,19 @@ impl NanometersApp {
             SpectrumFreqLine::Bright => {
                 if self.spectrum.last_rect.is_none() {
                     self.spectrum.last_rect = Some(rect);
-                    self.spectrum.lines = ref_lines(ui, rect, 1.0, self.setting.theme.frame);
+                    self.spectrum.lines =
+                        ref_lines(ui, rect, 1.0, self.setting.theme.spectrum_ref_line);
                     self.spectrum.line_brightness = false;
                 } else {
                     if self.spectrum.last_rect.unwrap() != rect {
                         self.spectrum.last_rect = Some(rect);
-                        self.spectrum.lines = ref_lines(ui, rect, 1.0, self.setting.theme.frame);
+                        self.spectrum.lines =
+                            ref_lines(ui, rect, 1.0, self.setting.theme.spectrum_ref_line);
                         self.spectrum.line_brightness = false;
                     } else {
                         if !self.spectrum.line_brightness {
                             self.spectrum.lines =
-                                ref_lines(ui, rect, 1.0, self.setting.theme.frame);
+                                ref_lines(ui, rect, 1.0, self.setting.theme.spectrum_ref_line);
                             self.spectrum.line_brightness = false;
                         }
                     }
