@@ -66,6 +66,7 @@ pub struct SpectrumSetting {
     pub(crate) threshold_follow_slope: bool,
     pub(crate) update_fps: f32,
     pub(crate) resolution: SpectrumResolution,
+    pub(crate) line_thickness: f32,
 }
 
 impl Default for SpectrumSetting {
@@ -85,6 +86,7 @@ impl Default for SpectrumSetting {
             threshold_follow_slope: false,
             update_fps: 144.0,
             resolution: SpectrumResolution::FFT2048,
+            line_thickness: 2.0,
         }
     }
 }

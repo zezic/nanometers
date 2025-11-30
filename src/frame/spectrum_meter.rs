@@ -184,8 +184,20 @@ impl NanometersApp {
                     }
                 }
 
-                let wave_0 = Shape::line(wave_0_points, Stroke::new(2.0, self.setting.theme.main));
-                let wave_1 = Shape::line(wave_1_points, Stroke::new(2.0, self.setting.theme.text));
+                let wave_0 = Shape::line(
+                    wave_0_points,
+                    Stroke::new(
+                        self.setting.spectrum.line_thickness,
+                        self.setting.theme.main,
+                    ),
+                );
+                let wave_1 = Shape::line(
+                    wave_1_points,
+                    Stroke::new(
+                        self.setting.spectrum.line_thickness,
+                        self.setting.theme.text,
+                    ),
+                );
                 ui.painter().add(wave_0);
                 ui.painter().add(wave_1);
             }

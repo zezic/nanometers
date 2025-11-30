@@ -641,6 +641,16 @@ impl NanometersApp {
                                 audio_souce_setting.spectrum = self.setting.spectrum.clone();
                             };
                         });
+                        ui.horizontal(|ui| {
+                            ui.label("Line Thickness");
+                            ui.add(
+                                egui::Slider::new(
+                                    &mut self.setting.spectrum.line_thickness,
+                                    0.25..=4.0,
+                                )
+                                .text("px"),
+                            );
+                        });
                     }
                     setting::SpectrumSwitch::Audio => {
                         ui.horizontal(|ui| {
