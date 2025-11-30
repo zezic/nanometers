@@ -8,11 +8,23 @@ pub enum OscilloscopeCycle {
     Single,
 }
 
-#[derive(Default, Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct OscilloscopeSetting {
     pub(crate) follow_pitch: bool,
     pub(crate) cycle: OscilloscopeCycle,
     pub(crate) shadow: bool,
+    pub(crate) update_fps: f32,
+}
+
+impl Default for OscilloscopeSetting {
+    fn default() -> Self {
+        Self {
+            follow_pitch: false,
+            cycle: OscilloscopeCycle::Multi,
+            shadow: false,
+            update_fps: 144.0,
+        }
+    }
 }
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]

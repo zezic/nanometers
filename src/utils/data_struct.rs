@@ -1,4 +1,5 @@
 use crate::setting::*;
+use crate::utils::ringbuffer::RingBufferF32;
 use egui::*;
 use std::collections::VecDeque;
 use std::{collections::binary_heap, fmt::Display};
@@ -221,6 +222,11 @@ pub struct SpectrumCalcBuffer {
     pub ab: bool,
     pub a: RawData,
     pub b: RawData,
+    pub sliding_buffer_l: RingBufferF32,
+    pub sliding_buffer_r: RingBufferF32,
+    pub sliding_buffer_m: RingBufferF32,
+    pub sliding_buffer_s: RingBufferF32,
+    pub update_counter: usize,
 }
 
 impl SpectrumCalcBuffer {
@@ -229,6 +235,24 @@ impl SpectrumCalcBuffer {
             ab: false,
             a: RawData::new(),
             b: RawData::new(),
+            sliding_buffer_l: RingBufferF32::new(8192), // Increase to support largest FFT size
+            sliding_buffer_r: RingBufferF32::new(8192),
+            sliding_buffer_m: RingBufferF32::new(8192),
+            sliding_buffer_s: RingBufferF32::new(8192),
+            update_counter: 0,
+        }
+    }
+
+    pub fn resize_for_resolution(&mut self, resolution: crate::setting::SpectrumResolution) {
+        let fft_size = resolution.fft_size();
+        let buffer_size = fft_size.max(2048); // Ensure minimum size for smooth operation
+
+        // Only resize if needed to avoid clearing buffers unnecessarily
+        if self.sliding_buffer_l.capacity() != buffer_size {
+            self.sliding_buffer_l = RingBufferF32::new(buffer_size);
+            self.sliding_buffer_r = RingBufferF32::new(buffer_size);
+            self.sliding_buffer_m = RingBufferF32::new(buffer_size);
+            self.sliding_buffer_s = RingBufferF32::new(buffer_size);
         }
     }
 }
@@ -247,20 +271,49 @@ pub struct AudioSourceBuffer {
     pub spectrogram: SpectrogramCalcBuffer,
     pub spectrum: SpectrumCalcBuffer,
     pub osc: OscCalcBuffer,
+    pub osc_sliding_buffer: RingBufferF32,
+    pub osc_update_counter: usize,
     pub setting: Setting,
 }
 
 impl AudioSourceBuffer {
     pub fn new() -> Self {
         Self {
-            ..Default::default()
+            fft_2048_index: 0,
+            raw: RawData::new(),
+            low_raw: RawData::new(),
+            mid_raw: RawData::new(),
+            high_raw: RawData::new(),
+            multiband: MultibandCalcBuffer::new(),
+            peak: PeakCalcBuffer::new(),
+            waveform: WaveformCalcBuffer::new(),
+            vector: VectorscopeCalcBuffer::new(),
+            spectrogram: SpectrogramCalcBuffer::new(),
+            spectrum: SpectrumCalcBuffer::new(),
+            osc: OscCalcBuffer::new(),
+            osc_sliding_buffer: RingBufferF32::new(2400),
+            osc_update_counter: 0,
+            setting: Setting::default(),
         }
     }
 
     pub fn new_with_setting(setting: Setting) -> Self {
         Self {
+            fft_2048_index: 0,
+            raw: RawData::new(),
+            low_raw: RawData::new(),
+            mid_raw: RawData::new(),
+            high_raw: RawData::new(),
+            multiband: MultibandCalcBuffer::new(),
+            peak: PeakCalcBuffer::new(),
+            waveform: WaveformCalcBuffer::new(),
+            vector: VectorscopeCalcBuffer::new(),
+            spectrogram: SpectrogramCalcBuffer::new(),
+            spectrum: SpectrumCalcBuffer::new(),
+            osc: OscCalcBuffer::new(),
+            osc_sliding_buffer: RingBufferF32::new(2400),
+            osc_update_counter: 0,
             setting,
-            ..Default::default()
         }
     }
 }

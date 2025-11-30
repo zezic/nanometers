@@ -46,46 +46,65 @@ pub fn get_callback(
             let s = (l - r) / 2.0;
 
             if spectrum_on {
-                if buf.spectrum.ab {
-                    // Update Buffer
-                    let spectrum_index = buf.spectrum.a.l.len();
-                    if spectrum_index >= 1024 {
-                        buf.spectrum.b.l.push(l * HANN_2048[spectrum_index - 1024]);
-                        buf.spectrum.b.r.push(r * HANN_2048[spectrum_index - 1024]);
-                        buf.spectrum.b.m.push(m * HANN_2048[spectrum_index - 1024]);
-                        buf.spectrum.b.s.push(s * HANN_2048[spectrum_index - 1024]);
+                // Use sliding window approach for higher update rate
+                buf.spectrum.sliding_buffer_l.push(l);
+                buf.spectrum.sliding_buffer_r.push(r);
+                buf.spectrum.sliding_buffer_m.push(m);
+                buf.spectrum.sliding_buffer_s.push(s);
+
+                buf.spectrum.update_counter += 1;
+
+                // Calculate dynamic update interval based on FPS setting
+                // Default to 48kHz but make it configurable later
+                let sample_rate = 48000.0;
+                let update_interval =
+                    (sample_rate / buf.setting.spectrum.update_fps.max(1.0)).max(1.0) as usize;
+
+                // Process FFT when we have enough samples and it's time to update
+                let fft_size = buf.setting.spectrum.resolution.fft_size();
+                if buf.spectrum.sliding_buffer_l.len() >= fft_size
+                    && buf.spectrum.update_counter >= update_interval
+                {
+                    // Create windowed data from sliding buffer
+                    let mut windowed_data = RawData::new();
+                    // Get the most recent samples and apply windowing
+                    let recent_l = buf.spectrum.sliding_buffer_l.get_recent(fft_size);
+                    let recent_r = buf.spectrum.sliding_buffer_r.get_recent(fft_size);
+                    let recent_m = buf.spectrum.sliding_buffer_m.get_recent(fft_size);
+                    let recent_s = buf.spectrum.sliding_buffer_s.get_recent(fft_size);
+
+                    match buf.setting.spectrum.resolution {
+                        SpectrumResolution::FFT1024 => {
+                            for j in 0..1024 {
+                                windowed_data.l.push(recent_l[j] * HANN_1024[j]);
+                                windowed_data.r.push(recent_r[j] * HANN_1024[j]);
+                                windowed_data.m.push(recent_m[j] * HANN_1024[j]);
+                                windowed_data.s.push(recent_s[j] * HANN_1024[j]);
+                            }
+                        }
+                        SpectrumResolution::FFT2048 => {
+                            for j in 0..2048 {
+                                windowed_data.l.push(recent_l[j] * HANN_2048[j]);
+                                windowed_data.r.push(recent_r[j] * HANN_2048[j]);
+                                windowed_data.m.push(recent_m[j] * HANN_2048[j]);
+                                windowed_data.s.push(recent_s[j] * HANN_2048[j]);
+                            }
+                        }
+                        SpectrumResolution::FFT4096 | SpectrumResolution::FFT8192 => {
+                            let hann_window =
+                                buf.setting.spectrum.resolution.generate_hann_window();
+                            for j in 0..fft_size {
+                                windowed_data.l.push(recent_l[j] * hann_window[j]);
+                                windowed_data.r.push(recent_r[j] * hann_window[j]);
+                                windowed_data.m.push(recent_m[j] * hann_window[j]);
+                                windowed_data.s.push(recent_s[j] * hann_window[j]);
+                            }
+                        }
                     }
-                    buf.spectrum.a.l.push(l * HANN_2048[spectrum_index]);
-                    buf.spectrum.a.r.push(r * HANN_2048[spectrum_index]);
-                    buf.spectrum.a.m.push(m * HANN_2048[spectrum_index]);
-                    buf.spectrum.a.s.push(s * HANN_2048[spectrum_index]);
-                    // Calculate FFT
-                    if buf.spectrum.a.l.len() >= 2048 {
-                        let mut a_data = buf.spectrum.a.clone();
-                        process_spectrum(&mut buf, &mut send_data, &mut a_data);
-                        buf.spectrum.a.clear();
-                    }
-                } else {
-                    let spectrum_index = buf.spectrum.b.l.len();
-                    if spectrum_index >= 1024 {
-                        buf.spectrum.a.l.push(l * HANN_2048[spectrum_index - 1024]);
-                        buf.spectrum.a.r.push(r * HANN_2048[spectrum_index - 1024]);
-                        buf.spectrum.a.m.push(m * HANN_2048[spectrum_index - 1024]);
-                        buf.spectrum.a.s.push(s * HANN_2048[spectrum_index - 1024]);
-                    }
-                    buf.spectrum.b.l.push(l * HANN_2048[spectrum_index]);
-                    buf.spectrum.b.r.push(r * HANN_2048[spectrum_index]);
-                    buf.spectrum.b.m.push(m * HANN_2048[spectrum_index]);
-                    buf.spectrum.b.s.push(s * HANN_2048[spectrum_index]);
-                    if buf.spectrum.b.l.len() >= 2048 {
-                        let mut b_data = buf.spectrum.b.clone();
-                        process_spectrum(&mut buf, &mut send_data, &mut b_data);
-                        buf.spectrum.b.clear();
-                    }
+
+                    process_spectrum(&mut buf, &mut send_data, &mut windowed_data);
+                    buf.spectrum.update_counter = 0;
                 }
-            } else {
-                buf.spectrum.a.clear();
-                buf.spectrum.b.clear();
             }
 
             if spectrogram_on {
@@ -185,80 +204,58 @@ pub fn get_callback(
             }
 
             if oscilloscope_on {
-                // Oscilloscope
-                if buf.setting.oscilloscope.follow_pitch {
-                    match buf.setting.oscilloscope.cycle {
-                        OscilloscopeCycle::Multi => {
-                            if buf.osc.last.is_none() {
-                                if m > 0.0 {
-                                    buf.osc.raw.push(m);
-                                    buf.osc.last = Some(m);
-                                }
-                            } else {
-                                let last_times_m = buf.osc.last.unwrap() * m;
-                                if last_times_m > 0.0 {
-                                    buf.osc.raw.push(m);
-                                    buf.osc.last = Some(m);
-                                } else if last_times_m == 0.0 {
-                                    buf.osc.raw.push(m);
-                                } else if last_times_m < 0.0 {
-                                    buf.osc.raw.push(m);
-                                    buf.osc.last = Some(m);
-                                    buf.osc.even_trun = !buf.osc.even_trun;
-                                }
-                            }
-                            if buf.osc.raw.len() >= 2200 && buf.osc.even_trun {
-                                send_data.oscilloscope = OscilloscopeSendData {
-                                    len: buf.osc.raw.len(),
-                                    data: buf.osc.raw.clone(),
-                                };
-                                buf.osc.clear();
-                            }
-                        }
-                        OscilloscopeCycle::Single => {
-                            if buf.osc.last.is_none() {
-                                if m > 0.0 {
-                                    buf.osc.raw.push(m);
-                                    buf.osc.last = Some(m);
-                                }
-                            } else {
-                                let last_times_m = buf.osc.last.unwrap() * m;
-                                if last_times_m > 0.0 {
-                                    buf.osc.raw.push(m);
-                                    buf.osc.last = Some(m);
-                                } else if last_times_m == 0.0 {
-                                    buf.osc.raw.push(m);
-                                } else if last_times_m < 0.0 {
-                                    buf.osc.raw.push(m);
-                                    buf.osc.last = Some(m);
-                                    if buf.osc.even_trun {
-                                        buf.osc.first_turn = true;
+                // Use sliding window approach for higher update rate
+                buf.osc_sliding_buffer.push(m);
+                buf.osc_update_counter += 1;
+
+                // Calculate dynamic update interval based on FPS setting
+                // Default to 48kHz but make it configurable later
+                let sample_rate = 48000.0;
+                let update_interval =
+                    (sample_rate / buf.setting.oscilloscope.update_fps.max(1.0)).max(1.0) as usize;
+
+                // Update oscilloscope display more frequently
+                if buf.osc_sliding_buffer.len() >= 1200 && buf.osc_update_counter >= update_interval
+                {
+                    let display_len = buf.osc_sliding_buffer.len().min(2400);
+                    let mut display_data = Vec::with_capacity(display_len);
+
+                    if buf.setting.oscilloscope.follow_pitch {
+                        // For pitch following, still use trigger detection but on sliding window
+                        match buf.setting.oscilloscope.cycle {
+                            OscilloscopeCycle::Multi | OscilloscopeCycle::Single => {
+                                // Find zero crossing for trigger
+                                let mut start_idx = 0;
+                                for j in 1..display_len {
+                                    let prev = buf.osc_sliding_buffer.get(j - 1);
+                                    let curr = buf.osc_sliding_buffer.get(j);
+                                    if prev <= 0.0 && curr > 0.0 {
+                                        start_idx = j;
+                                        break;
                                     }
-                                    buf.osc.even_trun = !buf.osc.even_trun;
+                                }
+
+                                // Copy from trigger point
+                                for j in start_idx..display_len {
+                                    display_data.push(buf.osc_sliding_buffer.get(j));
                                 }
                             }
-                            if buf.osc.first_turn && buf.osc.even_trun {
-                                send_data.oscilloscope = OscilloscopeSendData {
-                                    len: buf.osc.raw.len(),
-                                    data: buf.osc.raw.clone(),
-                                };
-                                buf.osc.clear();
-                            }
+                        }
+                    } else {
+                        // Simple sliding window without trigger
+                        for j in 0..display_len {
+                            display_data.push(buf.osc_sliding_buffer.get(j));
                         }
                     }
-                    // in case of buffer overflow
-                    if buf.osc.raw.len() >= 8192 {
-                        buf.osc.clear();
-                    }
-                } else {
-                    buf.osc.raw.push(m);
-                    if buf.osc.raw.len() >= 2400 {
+
+                    if !display_data.is_empty() {
                         send_data.oscilloscope = OscilloscopeSendData {
-                            len: 2400,
-                            data: buf.osc.raw.clone(),
+                            len: display_data.len(),
+                            data: display_data,
                         };
-                        buf.osc.clear();
                     }
+
+                    buf.osc_update_counter = 0;
                 }
             }
 
@@ -457,14 +454,19 @@ pub fn get_callback(
 }
 
 fn process_spectrum(buf: &mut AudioSourceBuffer, send_data: &mut SendData, data: &mut RawData) {
+    let fft_size = buf.setting.spectrum.resolution.fft_size();
+    let padded_size = fft_size * 2;
     let mut real_planner = RealFftPlanner::<f32>::new();
-    let r2c = real_planner.plan_fft_forward(4096);
+    let r2c = real_planner.plan_fft_forward(padded_size);
     let mut spectrum = r2c.make_output_vec();
+
     match buf.setting.spectrum.channel {
         SpectrumChannel::LR => {
-            data.l.extend_from_slice(&[0.0; 2048]);
-            data.r.extend_from_slice(&[0.0; 2048]);
+            // Zero-pad to double the FFT size
+            data.l.resize(padded_size, 0.0);
+            data.r.resize(padded_size, 0.0);
             r2c.process(&mut data.l, &mut spectrum).unwrap();
+
             send_data.spectrum.l = spectrum
                 .clone()
                 .iter()
@@ -478,8 +480,9 @@ fn process_spectrum(buf: &mut AudioSourceBuffer, send_data: &mut SendData, data:
                 .collect();
         }
         SpectrumChannel::MS => {
-            data.m.extend_from_slice(&[0.0; 2048]);
-            data.s.extend_from_slice(&[0.0; 2048]);
+            // Zero-pad to double the FFT size
+            data.m.resize(padded_size, 0.0);
+            data.s.resize(padded_size, 0.0);
             r2c.process(&mut data.m, &mut spectrum).unwrap();
             send_data.spectrum.l = spectrum
                 .clone()

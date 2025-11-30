@@ -256,6 +256,22 @@ impl NanometersApp {
                     ui.selectable_value(&mut self.setting.oscilloscope.shadow, true, "On");
                     ui.selectable_value(&mut self.setting.oscilloscope.shadow, false, "Off");
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Update FPS");
+                    if ui
+                        .add(
+                            egui::Slider::new(
+                                &mut self.setting.oscilloscope.update_fps,
+                                30.0..=144.0,
+                            )
+                            .text("fps"),
+                        )
+                        .changed()
+                    {
+                        let mut audio_souce_setting = self.audio_source_setting.try_lock().unwrap();
+                        audio_souce_setting.oscilloscope = self.setting.oscilloscope.clone();
+                    }
+                });
             });
         });
     }
@@ -557,6 +573,54 @@ impl NanometersApp {
                             );
                         });
                         ui.horizontal(|ui| {
+                            ui.label("Resolution");
+                            let mut resolution_changed = false;
+                            resolution_changed |= ui
+                                .selectable_value(
+                                    &mut self.setting.spectrum.resolution,
+                                    setting::SpectrumResolution::FFT1024,
+                                    "1024",
+                                )
+                                .changed();
+                            resolution_changed |= ui
+                                .selectable_value(
+                                    &mut self.setting.spectrum.resolution,
+                                    setting::SpectrumResolution::FFT2048,
+                                    "2048",
+                                )
+                                .changed();
+                            resolution_changed |= ui
+                                .selectable_value(
+                                    &mut self.setting.spectrum.resolution,
+                                    setting::SpectrumResolution::FFT4096,
+                                    "4096",
+                                )
+                                .changed();
+                            resolution_changed |= ui
+                                .selectable_value(
+                                    &mut self.setting.spectrum.resolution,
+                                    setting::SpectrumResolution::FFT8192,
+                                    "8192",
+                                )
+                                .changed();
+
+                            if resolution_changed {
+                                // Resize spectrum buffers for new resolution
+                                self.spectrum
+                                    .resize_for_resolution(self.setting.spectrum.resolution);
+                                // Resize audio callback sliding buffers
+                                if let Ok(mut buffer) = self.audio_source_buffer.try_lock() {
+                                    buffer
+                                        .spectrum
+                                        .resize_for_resolution(self.setting.spectrum.resolution);
+                                }
+                                // Propagate to audio callback
+                                let mut audio_souce_setting =
+                                    self.audio_source_setting.try_lock().unwrap();
+                                audio_souce_setting.spectrum = self.setting.spectrum.clone();
+                            }
+                        });
+                        ui.horizontal(|ui| {
                             ui.label("Smoothing");
                             ui.add(
                                 egui::Slider::new(&mut self.setting.spectrum.smoothing, 0.0..=0.99)
@@ -701,6 +765,21 @@ impl NanometersApp {
                         });
                     }
                 }
+
+                // FPS Setting for all spectrum modes
+                ui.horizontal(|ui| {
+                    ui.label("Update FPS");
+                    if ui
+                        .add(
+                            egui::Slider::new(&mut self.setting.spectrum.update_fps, 30.0..=144.0)
+                                .text("fps"),
+                        )
+                        .changed()
+                    {
+                        let mut audio_souce_setting = self.audio_source_setting.try_lock().unwrap();
+                        audio_souce_setting.spectrum = self.setting.spectrum.clone();
+                    }
+                });
             });
         });
     }

@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, marker::PhantomData};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct RingBufferF32 {
     buffer: VecDeque<f32>,
     capacity: usize,
@@ -45,8 +45,39 @@ impl RingBufferF32 {
         self.buffer.get(index).unwrap_or(&0.0).clone()
     }
 
+    pub fn get_slice(&self, start: usize, len: usize) -> Vec<f32> {
+        let mut result = Vec::with_capacity(len);
+        for i in 0..len {
+            result.push(self.get(start + i));
+        }
+        result
+    }
+
+    pub fn get_recent(&self, len: usize) -> Vec<f32> {
+        let mut result = Vec::with_capacity(len);
+        let buffer_len = self.buffer.len();
+        let take_len = len.min(buffer_len);
+
+        // Take the most recent samples from the end of the buffer
+        for i in 0..take_len {
+            let idx = buffer_len - take_len + i;
+            result.push(self.buffer[idx]);
+        }
+
+        // If we need more samples than available, pad with zeros at the beginning
+        while result.len() < len {
+            result.insert(0, 0.0);
+        }
+
+        result
+    }
+
     pub fn len(&self) -> usize {
         self.buffer.len()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
     }
 }
 
