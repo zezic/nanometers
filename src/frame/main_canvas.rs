@@ -233,16 +233,16 @@ impl NanometersApp {
                         self.modules_sequence_block(ui);
                         self.spectrogram_setting_block(ui);
                         self.vectorscope_settiing_block(ui);
+                        self.theme_setting_block(ui);
                         ui.end_row();
 
                         self.waveform_setting_block(ui);
                         self.spectrum_setting_block(ui);
                         self.oscilloscope_setting_block(ui);
+                        self.cpu_setting_block(ui);
                         ui.end_row();
 
                         self.device_setting_block(ui);
-                        self.theme_setting_block(ui);
-                        self.cpu_setting_block(ui);
                         ui.end_row();
                     });
                 });

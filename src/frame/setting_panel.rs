@@ -1,5 +1,5 @@
 use crate::audio::*;
-use crate::setting::{self, set_theme, Theme, VectorscopeMode, RainglowMapping};
+use crate::setting::{self, set_theme, RainglowMapping, Theme, VectorscopeMode};
 use crate::utils::*;
 use crate::NanometersApp;
 use egui::style::{Selection, WidgetVisuals, Widgets};
@@ -843,20 +843,29 @@ impl NanometersApp {
             ui.vertical(|ui| {
                 ui.heading("Theme");
 
-                // Theme selection
-                // Theme selection
+                // Theme selection with dropdown and navigation
                 let theme_names = self.setting.theme_manager.get_theme_names();
                 let current_name = self.setting.theme_manager.current_theme_name.clone();
                 let mut theme_changed = false;
                 let mut new_theme = None;
 
                 ui.horizontal(|ui| {
-                    for theme_name in &theme_names {
-                        if ui
-                            .selectable_label(current_name == *theme_name, theme_name)
-                            .clicked()
+                    // Previous theme button
+                    if ui.button("◀").clicked() {
+                        if let Some(current_index) =
+                            theme_names.iter().position(|name| name == &current_name)
                         {
-                            if self.setting.theme_manager.set_current_theme(theme_name) {
+                            let prev_index = if current_index == 0 {
+                                theme_names.len() - 1
+                            } else {
+                                current_index - 1
+                            };
+                            let prev_theme_name = &theme_names[prev_index];
+                            if self
+                                .setting
+                                .theme_manager
+                                .set_current_theme(prev_theme_name)
+                            {
                                 if let Some(theme) = self.setting.theme_manager.get_current_theme()
                                 {
                                     new_theme = Some(theme.clone());
@@ -865,6 +874,56 @@ impl NanometersApp {
                             }
                         }
                     }
+
+                    // Next theme button
+                    if ui.button("▶").clicked() {
+                        if let Some(current_index) =
+                            theme_names.iter().position(|name| name == &current_name)
+                        {
+                            let next_index = if current_index == theme_names.len() - 1 {
+                                0
+                            } else {
+                                current_index + 1
+                            };
+                            let next_theme_name = &theme_names[next_index];
+                            if self
+                                .setting
+                                .theme_manager
+                                .set_current_theme(next_theme_name)
+                            {
+                                if let Some(theme) = self.setting.theme_manager.get_current_theme()
+                                {
+                                    new_theme = Some(theme.clone());
+                                    theme_changed = true;
+                                }
+                            }
+                        }
+                    }
+
+                    // Theme dropdown
+                    egui::ComboBox::from_label("Theme")
+                        .selected_text(&current_name)
+                        .show_ui(ui, |ui| {
+                            for theme_name in &theme_names {
+                                if ui
+                                    .selectable_value(
+                                        &mut self.setting.theme_manager.current_theme_name,
+                                        theme_name.clone(),
+                                        theme_name,
+                                    )
+                                    .clicked()
+                                {
+                                    if self.setting.theme_manager.set_current_theme(theme_name) {
+                                        if let Some(theme) =
+                                            self.setting.theme_manager.get_current_theme()
+                                        {
+                                            new_theme = Some(theme.clone());
+                                            theme_changed = true;
+                                        }
+                                    }
+                                }
+                            }
+                        });
                 });
 
                 if theme_changed {
