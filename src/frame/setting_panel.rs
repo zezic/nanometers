@@ -334,7 +334,7 @@ impl NanometersApp {
                         .add(
                             egui::Slider::new(
                                 &mut self.setting.oscilloscope.update_fps,
-                                30.0..=144.0,
+                                30.0..=240.0,
                             )
                             .text("fps"),
                         )
@@ -853,7 +853,7 @@ impl NanometersApp {
                     ui.label("Update FPS");
                     if ui
                         .add(
-                            egui::Slider::new(&mut self.setting.spectrum.update_fps, 30.0..=144.0)
+                            egui::Slider::new(&mut self.setting.spectrum.update_fps, 30.0..=240.0)
                                 .text("fps"),
                         )
                         .changed()

@@ -162,7 +162,7 @@ impl NanometersApp {
             ui.painter().rect_filled(
                 drag_zone,
                 0.0,
-                self.setting.theme.bgaccent.gamma_multiply(1.2),
+                self.setting.theme.bgaccent.gamma_multiply(0.5),
             );
 
             // Add drag hint text
