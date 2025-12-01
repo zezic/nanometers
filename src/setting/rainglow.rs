@@ -2,7 +2,6 @@ use crate::setting::Theme;
 use egui::Color32;
 use serde::{Deserialize, Serialize};
 
-
 // Include the generated Rainglow themes at compile time
 include!(concat!(env!("OUT_DIR"), "/rainglow_themes.rs"));
 
@@ -23,16 +22,16 @@ pub struct RainglowMapping {
 impl Default for RainglowMapping {
     fn default() -> Self {
         Self {
-            main: "activityBarBadge.background".to_string(),
+            main: "editor.foreground".to_string(),
             bg: "editor.background".to_string(),
-            bgaccent: "sideBar.background".to_string(),
+            bgaccent: "dropdown.background".to_string(),
             text: "editor.foreground".to_string(),
-            accent: "list.activeSelectionBackground".to_string(),
+            accent: "editorLink.activeForeground".to_string(),
             frame: "editorIndentGuide.background".to_string(),
             selection: "editor.selectionBackground".to_string(),
-            spectrum_main: "activityBarBadge.background".to_string(),
-            spectrum_secondary: "statusBar.background".to_string(),
-            spectrum_ref_line: "editorLineNumber.foreground".to_string(),
+            spectrum_main: "editor.foreground".to_string(),
+            spectrum_secondary: "editorLineNumber.foreground".to_string(),
+            spectrum_ref_line: "panel.background".to_string(),
         }
     }
 }
@@ -191,7 +190,11 @@ mod tests {
         let theme_names = manager.get_theme_names();
 
         // Should have many themes loaded
-        assert!(theme_names.len() > 50, "Expected many Rainglow themes, got {}", theme_names.len());
+        assert!(
+            theme_names.len() > 50,
+            "Expected many Rainglow themes, got {}",
+            theme_names.len()
+        );
 
         // Check some expected themes exist
         assert!(theme_names.contains(&"darkside".to_string()));
@@ -218,7 +221,11 @@ mod tests {
         let keys = manager.get_available_color_keys("darkside");
 
         // Should have many color keys
-        assert!(keys.len() > 10, "Expected many color keys, got {}", keys.len());
+        assert!(
+            keys.len() > 10,
+            "Expected many color keys, got {}",
+            keys.len()
+        );
 
         // Check some expected keys exist
         assert!(keys.contains(&"editor.background".to_string()));

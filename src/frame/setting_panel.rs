@@ -55,6 +55,35 @@ impl Default for ThemeEditor {
 }
 
 impl NanometersApp {
+    // Helper function to update Rainglow theme preview
+    fn update_rainglow_preview(&mut self, ui: &mut egui::Ui) {
+        let current_name = self.setting.theme_manager.current_theme_name.clone();
+
+        // Only update if current theme is a Rainglow theme
+        if current_name.starts_with("Rainglow: ") {
+            // Update both temp and actual mapping
+            self.setting.rainglow_mapping = self.theme_editor.temp_rainglow_mapping.clone();
+
+            self.setting
+                .rainglow_manager
+                .set_mapping(self.setting.rainglow_mapping.clone());
+
+            // Regenerate all Rainglow themes with new mapping
+            self.setting
+                .theme_manager
+                .update_rainglow_themes(&self.setting.rainglow_manager);
+
+            // Apply the updated theme immediately - same logic as regular theme switching
+            if let Some(theme) = self.setting.theme_manager.get_current_theme().cloned() {
+                self.setting.theme = theme.clone();
+                self.setting.current_theme_name = current_name.clone();
+                ui.ctx().set_visuals(set_theme(self));
+                let mut audio_source_setting = self.audio_source_setting.try_lock().unwrap();
+                audio_source_setting.theme = theme;
+                audio_source_setting.current_theme_name = current_name;
+            }
+        }
+    }
     pub fn waveform_setting_block(&mut self, ui: &mut Ui) {
         ui.group(|ui| {
             ui.vertical(|ui| {
@@ -1276,7 +1305,7 @@ impl NanometersApp {
                     ui.horizontal(|ui| {
                         ui.label("Preview Theme:");
                         let theme_names = self.setting.rainglow_manager.get_theme_names();
-                        egui::ComboBox::from_label("")
+                        if egui::ComboBox::from_label("")
                             .selected_text(&self.theme_editor.selected_rainglow_theme)
                             .show_ui(ui, |ui| {
                                 for theme_name in &theme_names {
@@ -1286,7 +1315,18 @@ impl NanometersApp {
                                         theme_name,
                                     );
                                 }
-                            });
+                            })
+                            .response
+                            .changed()
+                        {
+                            // Switch to selected Rainglow theme for preview
+                            let rainglow_theme_name =
+                                format!("Rainglow: {}", self.theme_editor.selected_rainglow_theme);
+                            self.setting
+                                .theme_manager
+                                .set_current_theme(&rainglow_theme_name);
+                            self.update_rainglow_preview(ui);
+                        }
                     });
 
                     ui.separator();
@@ -1307,6 +1347,8 @@ impl NanometersApp {
 
                             ui.horizontal(|ui| {
                                 ui.label("Main:");
+                                let old_value =
+                                    self.theme_editor.temp_rainglow_mapping.main.clone();
                                 egui::ComboBox::from_id_source("main_mapping")
                                     .selected_text(&self.theme_editor.temp_rainglow_mapping.main)
                                     .show_ui(ui, |ui| {
@@ -1318,10 +1360,14 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value != self.theme_editor.temp_rainglow_mapping.main {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Background:");
+                                let old_value = self.theme_editor.temp_rainglow_mapping.bg.clone();
                                 egui::ComboBox::from_id_source("bg_mapping")
                                     .selected_text(&self.theme_editor.temp_rainglow_mapping.bg)
                                     .show_ui(ui, |ui| {
@@ -1333,10 +1379,15 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value != self.theme_editor.temp_rainglow_mapping.bg {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("BG Accent:");
+                                let old_value =
+                                    self.theme_editor.temp_rainglow_mapping.bgaccent.clone();
                                 egui::ComboBox::from_id_source("bgaccent_mapping")
                                     .selected_text(
                                         &self.theme_editor.temp_rainglow_mapping.bgaccent,
@@ -1353,10 +1404,15 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value != self.theme_editor.temp_rainglow_mapping.bgaccent {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Text:");
+                                let old_value =
+                                    self.theme_editor.temp_rainglow_mapping.text.clone();
                                 egui::ComboBox::from_id_source("text_mapping")
                                     .selected_text(&self.theme_editor.temp_rainglow_mapping.text)
                                     .show_ui(ui, |ui| {
@@ -1368,10 +1424,15 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value != self.theme_editor.temp_rainglow_mapping.text {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Accent:");
+                                let old_value =
+                                    self.theme_editor.temp_rainglow_mapping.accent.clone();
                                 egui::ComboBox::from_id_source("accent_mapping")
                                     .selected_text(&self.theme_editor.temp_rainglow_mapping.accent)
                                     .show_ui(ui, |ui| {
@@ -1383,6 +1444,9 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value != self.theme_editor.temp_rainglow_mapping.accent {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
                         });
 
@@ -1391,6 +1455,8 @@ impl NanometersApp {
 
                             ui.horizontal(|ui| {
                                 ui.label("Frame:");
+                                let old_value =
+                                    self.theme_editor.temp_rainglow_mapping.frame.clone();
                                 egui::ComboBox::from_id_source("frame_mapping")
                                     .selected_text(&self.theme_editor.temp_rainglow_mapping.frame)
                                     .show_ui(ui, |ui| {
@@ -1402,10 +1468,15 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value != self.theme_editor.temp_rainglow_mapping.frame {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Selection:");
+                                let old_value =
+                                    self.theme_editor.temp_rainglow_mapping.selection.clone();
                                 egui::ComboBox::from_id_source("selection_mapping")
                                     .selected_text(
                                         &self.theme_editor.temp_rainglow_mapping.selection,
@@ -1422,10 +1493,18 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value != self.theme_editor.temp_rainglow_mapping.selection {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Spectrum Main:");
+                                let old_value = self
+                                    .theme_editor
+                                    .temp_rainglow_mapping
+                                    .spectrum_main
+                                    .clone();
                                 egui::ComboBox::from_id_source("spectrum_main_mapping")
                                     .selected_text(
                                         &self.theme_editor.temp_rainglow_mapping.spectrum_main,
@@ -1442,10 +1521,20 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value
+                                    != self.theme_editor.temp_rainglow_mapping.spectrum_main
+                                {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Spectrum Secondary:");
+                                let old_value = self
+                                    .theme_editor
+                                    .temp_rainglow_mapping
+                                    .spectrum_secondary
+                                    .clone();
                                 egui::ComboBox::from_id_source("spectrum_secondary_mapping")
                                     .selected_text(
                                         &self.theme_editor.temp_rainglow_mapping.spectrum_secondary,
@@ -1462,10 +1551,20 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value
+                                    != self.theme_editor.temp_rainglow_mapping.spectrum_secondary
+                                {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Reference Line:");
+                                let old_value = self
+                                    .theme_editor
+                                    .temp_rainglow_mapping
+                                    .spectrum_ref_line
+                                    .clone();
                                 egui::ComboBox::from_id_source("spectrum_ref_mapping")
                                     .selected_text(
                                         &self.theme_editor.temp_rainglow_mapping.spectrum_ref_line,
@@ -1482,6 +1581,11 @@ impl NanometersApp {
                                             );
                                         }
                                     });
+                                if old_value
+                                    != self.theme_editor.temp_rainglow_mapping.spectrum_ref_line
+                                {
+                                    self.update_rainglow_preview(ui);
+                                }
                             });
                         });
                     });
