@@ -144,15 +144,48 @@ impl NanometersApp {
             }
         }
 
+        // Create drag zone at the top of the window (40 pixels)
+        let drag_zone = Rect::from_min_size(meters_rect.min, Vec2::new(meters_rect.width(), 40.0));
+        let drag_response = ui.interact(drag_zone, Id::new("drag_zone"), Sense::click_and_drag());
+
+        // Handle window dragging - trigger on drag start
+        if drag_response.drag_started() {
+            ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+        }
+
+        // Check for menu interaction after drag zone
         let meters_response = ui.interact(meters_rect, Id::new("meters_buttons"), Sense::click());
+        let show_menu = meters_response.contains_pointer() && !drag_response.dragged();
+
+        // Visual feedback for drag zone - only when not showing menu
+        if !show_menu && drag_response.hovered() {
+            ui.painter().rect_filled(
+                drag_zone,
+                0.0,
+                self.setting.theme.bgaccent.gamma_multiply(1.2),
+            );
+
+            // Add drag hint text
+            ui.painter().text(
+                drag_zone.center(),
+                Align2::CENTER_CENTER,
+                "Drag to move window",
+                FontId::proportional(12.0),
+                self.setting.theme.text.gamma_multiply(0.7),
+            );
+
+            // Add drag cursor
+            ui.ctx().set_cursor_icon(CursorIcon::Grab);
+        }
+        if drag_response.dragged() {
+            ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
+        }
+
         if meters_response.is_pointer_button_down_on() {
-            if ui.ctx().input(|key| key.key_pressed(Key::Space)) {
-                ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
-            }
             ui.ctx().send_viewport_cmd(ViewportCommand::MaxInnerSize(
                 ui.ctx().input(|i| i.viewport().monitor_size.unwrap()),
             ))
-        } else if meters_response.contains_pointer() {
+        } else if show_menu {
             ui.label("");
             ui.horizontal(|ui| {
                 ui.label("  ");
@@ -180,7 +213,7 @@ impl NanometersApp {
                     ui.ctx().send_viewport_cmd(ViewportCommand::Close);
                 }
 
-                ui.label("Hold SPACE then drag to move").highlight();
+                ui.label("Drag top edge to move window").highlight();
             });
         }
     }
@@ -224,5 +257,36 @@ impl NanometersApp {
                 }
             });
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui::*;
+
+    #[test]
+    fn test_drag_zone_dimensions() {
+        let meters_rect = Rect::from_two_pos([0.0, 0.0].into(), [800.0, 600.0].into());
+        let drag_zone = Rect::from_min_size(meters_rect.min, Vec2::new(meters_rect.width(), 40.0));
+
+        assert_eq!(drag_zone.min.x, 0.0);
+        assert_eq!(drag_zone.min.y, 0.0);
+        assert_eq!(drag_zone.max.x, 800.0);
+        assert_eq!(drag_zone.max.y, 40.0);
+        assert_eq!(drag_zone.height(), 40.0);
+        assert_eq!(drag_zone.width(), 800.0);
+    }
+
+    #[test]
+    fn test_drag_zone_positioning() {
+        let meters_rect = Rect::from_two_pos([10.0, 20.0].into(), [810.0, 620.0].into());
+        let drag_zone = Rect::from_min_size(meters_rect.min, Vec2::new(meters_rect.width(), 40.0));
+
+        // Drag zone should start at the top of the meters rect
+        assert_eq!(drag_zone.min.x, meters_rect.min.x);
+        assert_eq!(drag_zone.min.y, meters_rect.min.y);
+        assert_eq!(drag_zone.width(), meters_rect.width());
+        assert_eq!(drag_zone.height(), 40.0);
     }
 }
