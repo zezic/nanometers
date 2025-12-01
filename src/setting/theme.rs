@@ -27,6 +27,7 @@ pub struct ThemeManager {
     pub themes: HashMap<String, Theme>,
     pub current_theme_name: String,
     config_dir: PathBuf,
+    pub rainglow_themes: HashMap<String, Theme>,
 }
 
 pub fn create_dark_theme() -> Theme {
@@ -175,6 +176,7 @@ impl ThemeManager {
             themes: HashMap::new(),
             current_theme_name: "Dark".to_string(),
             config_dir: config_dir.clone(),
+            rainglow_themes: HashMap::new(),
         };
 
         // Ensure config directory exists
@@ -226,15 +228,19 @@ impl ThemeManager {
     }
 
     pub fn get_theme(&self, name: &str) -> Option<&Theme> {
-        self.themes.get(name)
+        self.themes
+            .get(name)
+            .or_else(|| self.rainglow_themes.get(name))
     }
 
     pub fn get_current_theme(&self) -> Option<&Theme> {
-        self.themes.get(&self.current_theme_name)
+        self.themes
+            .get(&self.current_theme_name)
+            .or_else(|| self.rainglow_themes.get(&self.current_theme_name))
     }
 
     pub fn set_current_theme(&mut self, name: &str) -> bool {
-        if self.themes.contains_key(name) {
+        if self.themes.contains_key(name) || self.rainglow_themes.contains_key(name) {
             self.current_theme_name = name.to_string();
             true
         } else {
@@ -339,6 +345,7 @@ impl ThemeManager {
 
     pub fn get_theme_names(&self) -> Vec<String> {
         let mut names: Vec<_> = self.themes.keys().cloned().collect();
+        names.extend(self.rainglow_themes.keys().cloned());
         names.sort();
         names
     }
@@ -347,7 +354,23 @@ impl ThemeManager {
         matches!(
             name,
             "Dark" | "Light" | "Pink" | "Cyberpunk" | "Ocean" | "Matrix"
-        )
+        ) || self.rainglow_themes.contains_key(name)
+    }
+
+    pub fn update_rainglow_themes(
+        &mut self,
+        rainglow_manager: &crate::setting::RainglowThemeManager,
+    ) {
+        self.rainglow_themes.clear();
+        for theme_name in rainglow_manager.get_theme_names() {
+            if let Some(theme) = rainglow_manager.convert_theme(&theme_name) {
+                self.rainglow_themes.insert(theme.name.clone(), theme);
+            }
+        }
+    }
+
+    pub fn is_rainglow_theme(&self, name: &str) -> bool {
+        self.rainglow_themes.contains_key(name)
     }
 }
 

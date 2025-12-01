@@ -5,6 +5,7 @@ pub(crate) mod audio_source;
 pub(crate) mod meter;
 pub(crate) mod oscilloscope;
 pub(crate) mod peak;
+pub(crate) mod rainglow;
 pub(crate) mod spectrogram;
 pub(crate) mod spectrum;
 pub(crate) mod theme;
@@ -16,6 +17,7 @@ pub use audio_source::*;
 pub use meter::*;
 pub use oscilloscope::*;
 pub use peak::*;
+pub use rainglow::*;
 pub use spectrogram::*;
 pub use spectrum::*;
 pub use theme::*;
@@ -35,6 +37,9 @@ pub struct Setting {
     pub current_theme_name: String,
     #[serde(skip)]
     pub theme_manager: ThemeManager,
+    pub rainglow_mapping: RainglowMapping,
+    #[serde(skip)]
+    pub rainglow_manager: RainglowThemeManager,
 }
 
 impl Default for Setting {
@@ -45,6 +50,8 @@ impl Default for Setting {
             .get_current_theme()
             .cloned()
             .unwrap_or(DARK_THEME);
+        let rainglow_mapping = RainglowMapping::default();
+        let rainglow_manager = RainglowThemeManager::with_mapping(rainglow_mapping.clone());
         Self {
             audio_device: AudioDeviceSetting::default(),
             waveform: WaveformSetting::default(),
@@ -67,6 +74,8 @@ impl Default for Setting {
             theme,
             current_theme_name,
             theme_manager,
+            rainglow_mapping,
+            rainglow_manager,
         }
     }
 }

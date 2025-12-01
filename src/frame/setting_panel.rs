@@ -1,5 +1,5 @@
 use crate::audio::*;
-use crate::setting::{self, set_theme, Theme, VectorscopeMode};
+use crate::setting::{self, set_theme, Theme, VectorscopeMode, RainglowMapping};
 use crate::utils::*;
 use crate::NanometersApp;
 use egui::style::{Selection, WidgetVisuals, Widgets};
@@ -11,7 +11,7 @@ struct Location {
     row: usize,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ThemeEditor {
     pub show_create_dialog: bool,
     pub new_theme_name: String,
@@ -26,6 +26,32 @@ pub struct ThemeEditor {
     pub copy_original_name: String,
     pub copy_new_name: String,
     pub error_message: Option<String>,
+    pub show_rainglow_mapping_dialog: bool,
+    pub temp_rainglow_mapping: RainglowMapping,
+    pub selected_rainglow_theme: String,
+}
+
+impl Default for ThemeEditor {
+    fn default() -> Self {
+        Self {
+            show_create_dialog: false,
+            new_theme_name: String::new(),
+            editing_theme: None,
+            temp_theme: Theme::default(),
+            show_rename_dialog: false,
+            rename_old_name: String::new(),
+            rename_new_name: String::new(),
+            show_delete_dialog: false,
+            delete_theme_name: String::new(),
+            show_create_copy_dialog: false,
+            copy_original_name: String::new(),
+            copy_new_name: String::new(),
+            error_message: None,
+            show_rainglow_mapping_dialog: false,
+            temp_rainglow_mapping: RainglowMapping::default(),
+            selected_rainglow_theme: String::new(),
+        }
+    }
 }
 
 impl NanometersApp {
@@ -889,6 +915,20 @@ impl NanometersApp {
                             self.theme_editor.delete_theme_name = current_name;
                         }
                     }
+
+                    if ui.button("Rainglow Mapping").clicked() {
+                        self.theme_editor.show_rainglow_mapping_dialog = true;
+                        self.theme_editor.temp_rainglow_mapping =
+                            self.setting.rainglow_mapping.clone();
+                        // Set first rainglow theme as selected if none selected
+                        if self.theme_editor.selected_rainglow_theme.is_empty() {
+                            let rainglow_names = self.setting.rainglow_manager.get_theme_names();
+                            if !rainglow_names.is_empty() {
+                                self.theme_editor.selected_rainglow_theme =
+                                    rainglow_names[0].clone();
+                            }
+                        }
+                    }
                 });
 
                 // Theme editor dialogs
@@ -1161,6 +1201,253 @@ impl NanometersApp {
                 }
             } else if cancel_clicked {
                 self.theme_editor.show_delete_dialog = false;
+            }
+        }
+
+        // Rainglow mapping dialog
+        if self.theme_editor.show_rainglow_mapping_dialog {
+            let mut save_clicked = false;
+            let mut cancel_clicked = false;
+
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Rainglow Color Mapping");
+
+                    // Theme selector for preview
+                    ui.horizontal(|ui| {
+                        ui.label("Preview Theme:");
+                        let theme_names = self.setting.rainglow_manager.get_theme_names();
+                        egui::ComboBox::from_label("")
+                            .selected_text(&self.theme_editor.selected_rainglow_theme)
+                            .show_ui(ui, |ui| {
+                                for theme_name in &theme_names {
+                                    ui.selectable_value(
+                                        &mut self.theme_editor.selected_rainglow_theme,
+                                        theme_name.clone(),
+                                        theme_name,
+                                    );
+                                }
+                            });
+                    });
+
+                    ui.separator();
+
+                    // Get available color keys from selected theme
+                    let available_keys = if !self.theme_editor.selected_rainglow_theme.is_empty() {
+                        self.setting
+                            .rainglow_manager
+                            .get_available_color_keys(&self.theme_editor.selected_rainglow_theme)
+                    } else {
+                        Vec::new()
+                    };
+
+                    // Color mapping controls
+                    ui.columns(2, |columns| {
+                        columns[0].vertical(|ui| {
+                            ui.heading("App Colors");
+
+                            ui.horizontal(|ui| {
+                                ui.label("Main:");
+                                egui::ComboBox::from_id_source("main_mapping")
+                                    .selected_text(&self.theme_editor.temp_rainglow_mapping.main)
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self.theme_editor.temp_rainglow_mapping.main,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Background:");
+                                egui::ComboBox::from_id_source("bg_mapping")
+                                    .selected_text(&self.theme_editor.temp_rainglow_mapping.bg)
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self.theme_editor.temp_rainglow_mapping.bg,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("BG Accent:");
+                                egui::ComboBox::from_id_source("bgaccent_mapping")
+                                    .selected_text(
+                                        &self.theme_editor.temp_rainglow_mapping.bgaccent,
+                                    )
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self
+                                                    .theme_editor
+                                                    .temp_rainglow_mapping
+                                                    .bgaccent,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Text:");
+                                egui::ComboBox::from_id_source("text_mapping")
+                                    .selected_text(&self.theme_editor.temp_rainglow_mapping.text)
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self.theme_editor.temp_rainglow_mapping.text,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Accent:");
+                                egui::ComboBox::from_id_source("accent_mapping")
+                                    .selected_text(&self.theme_editor.temp_rainglow_mapping.accent)
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self.theme_editor.temp_rainglow_mapping.accent,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+                        });
+
+                        columns[1].vertical(|ui| {
+                            ui.heading("Spectrum Colors");
+
+                            ui.horizontal(|ui| {
+                                ui.label("Frame:");
+                                egui::ComboBox::from_id_source("frame_mapping")
+                                    .selected_text(&self.theme_editor.temp_rainglow_mapping.frame)
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self.theme_editor.temp_rainglow_mapping.frame,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Selection:");
+                                egui::ComboBox::from_id_source("selection_mapping")
+                                    .selected_text(
+                                        &self.theme_editor.temp_rainglow_mapping.selection,
+                                    )
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self
+                                                    .theme_editor
+                                                    .temp_rainglow_mapping
+                                                    .selection,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Spectrum Main:");
+                                egui::ComboBox::from_id_source("spectrum_main_mapping")
+                                    .selected_text(
+                                        &self.theme_editor.temp_rainglow_mapping.spectrum_main,
+                                    )
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self
+                                                    .theme_editor
+                                                    .temp_rainglow_mapping
+                                                    .spectrum_main,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Spectrum Secondary:");
+                                egui::ComboBox::from_id_source("spectrum_secondary_mapping")
+                                    .selected_text(
+                                        &self.theme_editor.temp_rainglow_mapping.spectrum_secondary,
+                                    )
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self
+                                                    .theme_editor
+                                                    .temp_rainglow_mapping
+                                                    .spectrum_secondary,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Reference Line:");
+                                egui::ComboBox::from_id_source("spectrum_ref_mapping")
+                                    .selected_text(
+                                        &self.theme_editor.temp_rainglow_mapping.spectrum_ref_line,
+                                    )
+                                    .show_ui(ui, |ui| {
+                                        for key in &available_keys {
+                                            ui.selectable_value(
+                                                &mut self
+                                                    .theme_editor
+                                                    .temp_rainglow_mapping
+                                                    .spectrum_ref_line,
+                                                key.clone(),
+                                                key,
+                                            );
+                                        }
+                                    });
+                            });
+                        });
+                    });
+
+                    ui.separator();
+
+                    ui.horizontal(|ui| {
+                        save_clicked = ui.button("Save Mapping").clicked();
+                        cancel_clicked = ui.button("Cancel").clicked();
+                    });
+                });
+            });
+
+            if save_clicked {
+                // Save the mapping and update themes
+                self.setting.rainglow_mapping = self.theme_editor.temp_rainglow_mapping.clone();
+                self.setting
+                    .rainglow_manager
+                    .set_mapping(self.setting.rainglow_mapping.clone());
+                self.setting
+                    .theme_manager
+                    .update_rainglow_themes(&self.setting.rainglow_manager);
+                self.theme_editor.show_rainglow_mapping_dialog = false;
+            } else if cancel_clicked {
+                self.theme_editor.show_rainglow_mapping_dialog = false;
             }
         }
 

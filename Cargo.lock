@@ -2029,6 +2029,8 @@ dependencies = [
  "egui",
  "env_logger",
  "interprocess",
+ "lazy_static",
+ "once_cell",
  "piet-common",
  "puffin",
  "puffin_http",

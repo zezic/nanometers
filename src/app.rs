@@ -103,6 +103,13 @@ impl NanometersApp {
                 eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
             // Initialize theme manager after deserialization
             app.setting.theme_manager = ThemeManager::new();
+            // Initialize Rainglow manager with saved mapping
+            app.setting.rainglow_manager =
+                RainglowThemeManager::with_mapping(app.setting.rainglow_mapping.clone());
+            // Update theme manager with Rainglow themes
+            app.setting
+                .theme_manager
+                .update_rainglow_themes(&app.setting.rainglow_manager);
             // Restore the saved theme selection
             app.setting
                 .theme_manager

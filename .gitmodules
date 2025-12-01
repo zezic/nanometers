@@ -1,0 +1,3 @@
+[submodule "rainglow-themes"]
+	path = rainglow-themes
+	url = git@github.com:rainglow/vscode.git
